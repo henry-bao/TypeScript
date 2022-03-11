@@ -1819,13 +1819,22 @@ namespace ts {
             }
 
             const pos = getNodePos();
+            function nonTemplateLiteralKindResult(){
+                switch(kind) {
+                    case SyntaxKind.NumericLiteral:
+                        return factory.createNumericLiteral("", /*numericLiteralFlags*/ undefined);
+                    case SyntaxKind.StringLiteral:
+                        return factory.createStringLiteral("", /*isSingleQuote*/ undefined);
+                    case SyntaxKind.MissingDeclaration:
+                        return factory.createMissingDeclaration();
+                    default:
+                        return factory.createToken(kind);
+                }
+            }
             const result =
                 kind === SyntaxKind.Identifier ? factory.createIdentifier("", /*typeArguments*/ undefined, /*originalKeywordKind*/ undefined) :
                 isTemplateLiteralKind(kind) ? factory.createTemplateLiteralLikeNode(kind, "", "", /*templateFlags*/ undefined) :
-                kind === SyntaxKind.NumericLiteral ? factory.createNumericLiteral("", /*numericLiteralFlags*/ undefined) :
-                kind === SyntaxKind.StringLiteral ? factory.createStringLiteral("", /*isSingleQuote*/ undefined) :
-                kind === SyntaxKind.MissingDeclaration ? factory.createMissingDeclaration() :
-                factory.createToken(kind);
+                nonTemplateLiteralKindResult();
             return finishNode(result, pos) as T;
         }
 
