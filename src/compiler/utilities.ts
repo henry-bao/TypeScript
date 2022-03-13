@@ -211,7 +211,7 @@ namespace ts {
     }
 
     export function hasChangesInResolutions<T>(
-        names: readonly string[],
+        names: readonly string[] | readonly FileReference[],
         newResolutions: readonly T[],
         oldResolutions: ModeAwareCache<T> | undefined,
         oldSourceFile: SourceFile | undefined,
@@ -220,7 +220,11 @@ namespace ts {
 
         for (let i = 0; i < names.length; i++) {
             const newResolution = newResolutions[i];
-            const oldResolution = oldResolutions && oldResolutions.get(names[i], oldSourceFile && getModeForResolutionAtIndex(oldSourceFile, i));
+            const entry = names[i];
+            // We lower-case all type references because npm automatically lowercases all packages. See GH#9824.
+            const name = !isString(entry) ? entry.fileName.toLowerCase() : entry;
+            const mode = !isString(entry) ? getModeForFileReference(entry, oldSourceFile?.impliedNodeFormat) : oldSourceFile && getModeForResolutionAtIndex(oldSourceFile, i);
+            const oldResolution = oldResolutions && oldResolutions.get(name, mode);
             const changed =
                 oldResolution
                     ? !newResolution || !comparer(oldResolution, newResolution)
@@ -983,7 +987,7 @@ namespace ts {
         return name.kind === SyntaxKind.ComputedPropertyName && !isStringOrNumericLiteralLike(name.expression);
     }
 
-    export function getTextOfPropertyName(name: PropertyName | NoSubstitutionTemplateLiteral): __String {
+    export function tryGetTextOfPropertyName(name: PropertyName | NoSubstitutionTemplateLiteral): __String | undefined {
         switch (name.kind) {
             case SyntaxKind.Identifier:
             case SyntaxKind.PrivateIdentifier:
@@ -994,10 +998,14 @@ namespace ts {
                 return escapeLeadingUnderscores(name.text);
             case SyntaxKind.ComputedPropertyName:
                 if (isStringOrNumericLiteralLike(name.expression)) return escapeLeadingUnderscores(name.expression.text);
-                return Debug.fail("Text of property name cannot be read from non-literal-valued ComputedPropertyNames");
+                return undefined;
             default:
                 return Debug.assertNever(name);
         }
+    }
+
+    export function getTextOfPropertyName(name: PropertyName | NoSubstitutionTemplateLiteral): __String {
+        return Debug.checkDefined(tryGetTextOfPropertyName(name));
     }
 
     export function entityNameToString(name: EntityNameOrEntityNameExpression | JSDocMemberName | JsxTagNameExpression | PrivateIdentifier): string {
@@ -1300,7 +1308,7 @@ namespace ts {
             case SyntaxKind.VoidKeyword:
                 return node.parent.kind !== SyntaxKind.VoidExpression;
             case SyntaxKind.ExpressionWithTypeArguments:
-                return !isExpressionWithTypeArgumentsInClassExtendsClause(node);
+                return isHeritageClause(node.parent) && !isExpressionWithTypeArgumentsInClassExtendsClause(node);
             case SyntaxKind.TypeParameter:
                 return node.parent.kind === SyntaxKind.MappedType || node.parent.kind === SyntaxKind.InferType;
 
@@ -1340,7 +1348,7 @@ namespace ts {
                 }
                 switch (parent.kind) {
                     case SyntaxKind.ExpressionWithTypeArguments:
-                        return !isExpressionWithTypeArgumentsInClassExtendsClause(parent);
+                        return isHeritageClause(parent.parent) && !isExpressionWithTypeArgumentsInClassExtendsClause(parent);
                     case SyntaxKind.TypeParameter:
                         return node === (parent as TypeParameterDeclaration).constraint;
                     case SyntaxKind.JSDocTemplateTag:
@@ -1512,10 +1520,21 @@ namespace ts {
             && node.parent.parent.kind === SyntaxKind.VariableStatement;
     }
 
-    export function isValidESSymbolDeclaration(node: Node): node is VariableDeclaration | PropertyDeclaration | SignatureDeclaration {
-        return isVariableDeclaration(node) ? isVarConst(node) && isIdentifier(node.name) && isVariableDeclarationInVariableStatement(node) :
+    export function isCommonJsExportedExpression(node: Node) {
+        if (!isInJSFile(node)) return false;
+        return (isObjectLiteralExpression(node.parent) && isBinaryExpression(node.parent.parent) && getAssignmentDeclarationKind(node.parent.parent) === AssignmentDeclarationKind.ModuleExports) ||
+            isCommonJsExportPropertyAssignment(node.parent);
+    }
+
+    export function isCommonJsExportPropertyAssignment(node: Node) {
+        if (!isInJSFile(node)) return false;
+        return (isBinaryExpression(node) && getAssignmentDeclarationKind(node) === AssignmentDeclarationKind.ExportsProperty);
+    }
+
+    export function isValidESSymbolDeclaration(node: Node): boolean {
+        return (isVariableDeclaration(node) ? isVarConst(node) && isIdentifier(node.name) && isVariableDeclarationInVariableStatement(node) :
             isPropertyDeclaration(node) ? hasEffectiveReadonlyModifier(node) && hasStaticModifier(node) :
-            isPropertySignature(node) && hasEffectiveReadonlyModifier(node);
+            isPropertySignature(node) && hasEffectiveReadonlyModifier(node)) || isCommonJsExportPropertyAssignment(node);
     }
 
     export function introducesArgumentsExoticObject(node: Node) {
@@ -1569,7 +1588,7 @@ namespace ts {
     export function getPropertyAssignment(objectLiteral: ObjectLiteralExpression, key: string, key2?: string): readonly PropertyAssignment[] {
         return objectLiteral.properties.filter((property): property is PropertyAssignment => {
             if (property.kind === SyntaxKind.PropertyAssignment) {
-                const propName = getTextOfPropertyName(property.name);
+                const propName = tryGetTextOfPropertyName(property.name);
                 return key === propName || (!!key2 && key2 === propName);
             }
             return false;
@@ -2066,7 +2085,7 @@ namespace ts {
             case SyntaxKind.SpreadAssignment:
                 return true;
             case SyntaxKind.ExpressionWithTypeArguments:
-                return (parent as ExpressionWithTypeArguments).expression === node && isExpressionWithTypeArgumentsInClassExtendsClause(parent);
+                return (parent as ExpressionWithTypeArguments).expression === node && !isPartOfTypeNode(parent);
             case SyntaxKind.ShorthandPropertyAssignment:
                 return (parent as ShorthandPropertyAssignment).objectAssignmentInitializer === node;
             default:
@@ -4602,7 +4621,7 @@ namespace ts {
 
     /** template tags are only available when a typedef isn't already using them */
     function isNonTypeAliasTemplate(tag: JSDocTag): tag is JSDocTemplateTag {
-        return isJSDocTemplateTag(tag) && !(tag.parent.kind === SyntaxKind.JSDocComment && tag.parent.tags!.some(isJSDocTypeAlias));
+        return isJSDocTemplateTag(tag) && !(tag.parent.kind === SyntaxKind.JSDoc && tag.parent.tags!.some(isJSDocTypeAlias));
     }
 
     /**
@@ -6384,7 +6403,7 @@ namespace ts {
          * don't include automatic type reference directives. Must be called only when
          * `hasProcessedResolutions` returns false (once per cache instance).
          */
-        setSymlinksFromResolutions(files: readonly SourceFile[], typeReferenceDirectives: ReadonlyESMap<string, ResolvedTypeReferenceDirective | undefined> | undefined): void;
+        setSymlinksFromResolutions(files: readonly SourceFile[], typeReferenceDirectives: ModeAwareCache<ResolvedTypeReferenceDirective | undefined> | undefined): void;
         /**
          * @internal
          * Whether `setSymlinksFromResolutions` has already been called.
