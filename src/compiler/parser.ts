@@ -7940,7 +7940,7 @@ namespace ts {
 
 
 
-                class TagParser {
+                /*class TagParser {
                   tag: any;
                   tagName: any;
                   start: any;
@@ -7949,7 +7949,7 @@ namespace ts {
 
                   constructor (tag: any, tagName: any, start: any, margin: any, indentText: any) {
                     this.tag = tag;
-                    this.tagName =  tagName;
+                    this.tagName = tagName;
                     this.start = start;
                     this.margin = margin;
                     this.indentText = indentText;
@@ -8025,7 +8025,7 @@ namespace ts {
                     }
                   }
 
-                }
+                }*/
 
                 function parseTag(margin: number) {
                     Debug.assert(token() === SyntaxKind.AtToken);
@@ -8035,12 +8035,84 @@ namespace ts {
                     const tagName = parseJSDocIdentifierName(/*message*/ undefined);
                     const indentText = skipWhitespaceOrAsterisk();
 
+                    const tag = parseTagHelper(tagName, start, margin, indentText);
+
+                    return tag;
+                }
+
+                function parseTagHelper(tagName: Identifier, start: number, margin: number, indentText: string) {
                     let tag: JSDocTag | undefined;
+                    /*let tagParser = new TagParser(tag, tagName, start, margin, indentText)
 
-                    let tagParser = new TagParser(tag, tagName, start, margin, indentText)
+                    tagParser.parseTags()*/
 
-                    tagParser.parseTags()
-
+                    switch (tagName.escapedText) {
+                        case "author":
+                            tag = parseAuthorTag(start, tagName, margin, indentText);
+                            break;
+                        case "implements":
+                            tag = parseImplementsTag(start, tagName, margin, indentText);
+                            break;
+                        case "augments":
+                        case "extends":
+                            tag = parseAugmentsTag(start, tagName, margin, indentText);
+                            break;
+                        case "class":
+                        case "constructor":
+                            tag = parseSimpleTag(start, factory.createJSDocClassTag, tagName, margin, indentText);
+                            break;
+                        case "public":
+                            tag = parseSimpleTag(start, factory.createJSDocPublicTag, tagName, margin, indentText);
+                            break;
+                        case "private":
+                            tag = parseSimpleTag(start, factory.createJSDocPrivateTag, tagName, margin, indentText);
+                            break;
+                        case "protected":
+                            tag = parseSimpleTag(start, factory.createJSDocProtectedTag, tagName, margin, indentText);
+                            break;
+                        case "readonly":
+                            tag = parseSimpleTag(start, factory.createJSDocReadonlyTag, tagName, margin, indentText);
+                            break;
+                        case "override":
+                            tag = parseSimpleTag(start, factory.createJSDocOverrideTag, tagName, margin, indentText);
+                            break;
+                        case "deprecated":
+                            hasDeprecatedTag = true;
+                            tag = parseSimpleTag(start, factory.createJSDocDeprecatedTag, tagName, margin, indentText);
+                            break;
+                        case "this":
+                            tag = parseThisTag(start, tagName, margin, indentText);
+                            break;
+                        case "enum":
+                            tag = parseEnumTag(start, tagName, margin, indentText);
+                            break;
+                        case "arg":
+                        case "argument":
+                        case "param":
+                            return parseParameterOrPropertyTag(start, tagName, PropertyLikeParse.Parameter, margin);
+                        case "return":
+                        case "returns":
+                            tag = parseReturnTag(start, tagName, margin, indentText);
+                            break;
+                        case "template":
+                            tag = parseTemplateTag(start, tagName, margin, indentText);
+                            break;
+                        case "type":
+                            tag = parseTypeTag(start, tagName, margin, indentText);
+                            break;
+                        case "typedef":
+                            tag = parseTypedefTag(start, tagName, margin, indentText);
+                            break;
+                        case "callback":
+                            tag = parseCallbackTag(start, tagName, margin, indentText);
+                            break;
+                        case "see":
+                            tag = parseSeeTag(start, tagName, margin, indentText);
+                            break;
+                        default:
+                            tag = parseUnknownTag(start, tagName, margin, indentText);
+                            break;
+                    }
                     return tag;
                 }
 
