@@ -7938,9 +7938,6 @@ namespace ts {
                     return seenLineBreak ? indentText : "";
                 }
 
-                // not sure if this would be correct - this is directly
-                // copied from the parser function below, so if it's not correct,
-                // feel free to move
                 class TagParser {
 
                   constructor (tag, tagName, start, margin, indentText) {
@@ -8034,6 +8031,8 @@ namespace ts {
                     let tag: JSDocTag | undefined;
 
                     let TagParser = new TagParser(tag, tagName, start, margin, indentText)
+
+                    TagParser.parseTags()
 
                     return tag;
                 }
