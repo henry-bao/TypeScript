@@ -7906,15 +7906,20 @@ namespace ts {
                     return seenLineBreak ? indentText : "";
                 }
 
-                function parseTag(margin: number) {
-                    Debug.assert(token() === SyntaxKind.AtToken);
-                    const start = scanner.getTokenPos();
-                    nextTokenJSDoc();
+                // not sure if this would be correct - this is directly
+                // copied from the parser function below, so if it's not correct,
+                // feel free to move
+                class TagParser {
 
-                    const tagName = parseJSDocIdentifierName(/*message*/ undefined);
-                    const indentText = skipWhitespaceOrAsterisk();
+                  constructor (tag, tagName, start, margin, indentText) {
+                    this.tag = tag;
+                    this.tagName =  tagName;
+                    this.start = start;
+                    this.margin = margin;
+                    this.indentText = indentText;
+                  }
 
-                    let tag: JSDocTag | undefined;
+                  parseTags() {
                     switch (tagName.escapedText) {
                         case "author":
                             tag = parseAuthorTag(start, tagName, margin, indentText);
@@ -7982,6 +7987,22 @@ namespace ts {
                             tag = parseUnknownTag(start, tagName, margin, indentText);
                             break;
                     }
+                  }
+
+                }
+
+                function parseTag(margin: number) {
+                    Debug.assert(token() === SyntaxKind.AtToken);
+                    const start = scanner.getTokenPos();
+                    nextTokenJSDoc();
+
+                    const tagName = parseJSDocIdentifierName(/*message*/ undefined);
+                    const indentText = skipWhitespaceOrAsterisk();
+
+                    let tag: JSDocTag | undefined;
+
+                    let TagParser = new TagParser(tag, tagName, start, margin, indentText)
+
                     return tag;
                 }
 
