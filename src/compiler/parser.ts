@@ -7779,7 +7779,16 @@ namespace ts {
                     callback: parseCallbackTag,
                     see: parseSeeTag
                 };
-                
+                const simpleTagToJSDocTagConstructor: { [key: string]: JSDocTag; } = {
+                    class: factory.createJSDocClassTag,
+                    constructor: factory.createJSDocClassTag,
+                    public: factory.createJSDocPublicTag,
+                    private: factory.createJSDocPrivateTag,
+                    protected: factory.createJSDocProtectedTag,
+                    readonly: factory.createJSDocReadonlyTag,
+                    override: factory.createJSDocOverrideTag,
+                    deprecated: factory.createJSDocDeprecatedTag
+                };
 
                 Debug.assert(start >= 0);
                 Debug.assert(start <= end);
@@ -7993,9 +8002,21 @@ namespace ts {
 
                 function parseSimpleTagAllocator(start: number, tagName: Identifier, margin: number, indentText: string) {
                     let tag: JSDocTag | undefined;
+                    let tagConstructor: JSDocTag = simpleTagToJSDocTagConstructor["constructor"];
+                    tag = parseSimpleTag(start, tagConstructor, tagName, margin, indentText);
+
+
+                    /*if (simpleTagToJSDocTagConstructor.hasOwnProperty("" + tagName.escapedText)) {
+                        let tagConstructor : Function = simpleTagToJSDocTagConstructor["" + tagName.escapedText];
+                        tag = parseSimpleTag(start, tagConstructor, tagName, margin, indentText);
+                    }
+                    parseSimpleTag(start, factory.createJSDocClassTag, tagName, margin, indentText);*/
+                    
                     switch (tagName.escapedText) {
                         case "class":
                         case "constructor":
+                            //let tagConstructor: Function = simpleTagToJSDocTagConstructor["constructor"];
+                            //tag = parseSimpleTag(start, tagConstructor, tagName, margin, indentText);
                             tag = parseSimpleTag(start, factory.createJSDocClassTag, tagName, margin, indentText);
                             break;
                         case "public":
