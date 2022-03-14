@@ -7753,6 +7753,34 @@ namespace ts {
                 const content = sourceText;
                 const end = length === undefined ? content.length : start + length;
                 length = end - start;
+                const dict: { [key: string]: Function; } = {
+                    //"author": {run: parseAuthorTag(start, tagName, margin, indentText)}
+                    //"author": parseAuthorTag()
+                    author: parseAuthorTag,
+                    implements: parseImplementsTag,
+                    augments: parseAugmentsTag,
+                    extends: parseAugmentsTag,
+                    class: parseSimpleTagAllocator,
+                    constructor: parseSimpleTagAllocator,
+                    public: parseSimpleTagAllocator,
+                    private: parseSimpleTagAllocator,
+                    protected: parseSimpleTagAllocator,
+                    readonly: parseSimpleTagAllocator,
+                    override: parseSimpleTagAllocator,
+                    deprecated: parseSimpleTagAllocator,
+                    this: parseThisTag,
+                    enum: parseEnumTag,
+                    //arg: parseParameterOrPropertyTag,
+                    //argument: parseParameterOrPropertyTag,
+                    //param: parseParameterOrPropertyTag,
+                    return: parseReturnTag,
+                    returns: parseReturnTag,
+                    template: parseTemplateTag,
+                    type: parseTypeTag,
+                    typedef: parseTypedefTag,
+                    callback: parseCallbackTag,
+                    see: parseSeeTag
+                };
 
                 Debug.assert(start >= 0);
                 Debug.assert(start <= end);
@@ -7953,21 +7981,12 @@ namespace ts {
 
                 function parseTagHelper(tagName: Identifier, start: number, margin: number, indentText: string) {
                     let tag: JSDocTag | undefined;
-                    /*let tagParser = new TagParser(tag, tagName, start, margin, indentText)
-
-                    tagParser.parseTags()*/
 
                     switch (tagName.escapedText) {
                         case "author":
-                            tag = parseAuthorTag(start, tagName, margin, indentText);
-                            break;
                         case "implements":
-                            tag = parseImplementsTag(start, tagName, margin, indentText);
-                            break;
                         case "augments":
                         case "extends":
-                            tag = parseAugmentsTag(start, tagName, margin, indentText);
-                            break;
                         case "class":
                         case "constructor":
                         case "public":
@@ -7976,37 +7995,22 @@ namespace ts {
                         case "readonly":
                         case "override":
                         case "deprecated":
-                            tag = parseSimpleTagAllocator(start, tagName, margin, indentText);
-                            break;
                         case "this":
-                            tag = parseThisTag(start, tagName, margin, indentText);
-                            break;
                         case "enum":
-                            tag = parseEnumTag(start, tagName, margin, indentText);
+                        case "return":
+                        case "returns":
+                        case "template":
+                        case "type":
+                        case "typedef":
+                        case "callback":
+                        case "see":
+                            const getTag = dict[tagName.escapedText];
+                            tag = getTag(start, tagName, margin, indentText);
                             break;
                         case "arg":
                         case "argument":
                         case "param":
                             return parseParameterOrPropertyTag(start, tagName, PropertyLikeParse.Parameter, margin);
-                        case "return":
-                        case "returns":
-                            tag = parseReturnTag(start, tagName, margin, indentText);
-                            break;
-                        case "template":
-                            tag = parseTemplateTag(start, tagName, margin, indentText);
-                            break;
-                        case "type":
-                            tag = parseTypeTag(start, tagName, margin, indentText);
-                            break;
-                        case "typedef":
-                            tag = parseTypedefTag(start, tagName, margin, indentText);
-                            break;
-                        case "callback":
-                            tag = parseCallbackTag(start, tagName, margin, indentText);
-                            break;
-                        case "see":
-                            tag = parseSeeTag(start, tagName, margin, indentText);
-                            break;
                         default:
                             tag = parseUnknownTag(start, tagName, margin, indentText);
                             break;
@@ -9025,34 +9029,31 @@ namespace ts {
             function visitNode(child: IncrementalNode) {
                 Debug.assert(child.pos <= child.end);
                 if (child.pos > changeRangeOldEnd) {
-                    // Node is entirely past the change range.  We need to move both its pos and
-                    // end, forward or backward appropriately.
                     moveElementEntirelyPastChangeRange(child, /*isArray*/ false, delta, oldText, newText, aggressiveChecks);
                     return;
                 }
-
-                // Check if the element intersects the change range.  If it does, then it is not
-                // reusable.  Also, we'll need to recurse to see what constituent portions we may
-                // be able to use.
                 const fullEnd = child.end;
-                if (fullEnd >= changeStart) {
-                    child.intersectsChange = true;
-                    child._children = undefined;
-
-                    // Adjust the pos or end (or both) of the intersecting element accordingly.
-                    adjustIntersectingElement(child, changeStart, changeRangeOldEnd, changeRangeNewEnd, delta);
-                    forEachChild(child, visitNode, visitArray);
-                    if (hasJSDocNodes(child)) {
-                        for (const jsDocComment of child.jsDoc!) {
-                            visitNode(jsDocComment as Node as IncrementalNode);
-                        }
-                    }
-                    checkNodePositions(child, aggressiveChecks);
+                const intersectsChangeRange = fullEnd >= changeStart;
+                if (intersectsChangeRange) {
+                    checkChildrenIntersections(child);
                     return;
                 }
-
-                // Otherwise, the node is entirely before the change range.  No need to do anything with it.
                 Debug.assert(fullEnd < changeStart);
+            }
+
+            function checkChildrenIntersections(child: IncrementalNode) {
+                child.intersectsChange = true;
+                child._children = undefined;
+
+                adjustIntersectingElement(child, changeStart, changeRangeOldEnd, changeRangeNewEnd, delta);
+                forEachChild(child, visitNode, visitArray);
+                if (hasJSDocNodes(child)) {
+                    for (const jsDocComment of child.jsDoc!) {
+                        visitNode(jsDocComment as Node as IncrementalNode);
+                    }
+                }
+                checkNodePositions(child, aggressiveChecks);
+                return;
             }
 
             function visitArray(array: IncrementalNodeArray) {
