@@ -1812,22 +1812,31 @@ namespace ts {
             }
 
             const pos = getNodePos();
-            function createNodeBasedOnSyntaxKind() {
-                if (isTemplateLiteralKind(kind)) return factory.createTemplateLiteralLikeNode(kind, "", "", /*templateFlags*/ undefined);
+            let result: TemplateLiteralLikeNode | NumericLiteral | StringLiteral | MissingDeclaration | Identifier | Token<T["kind"]>;
+
+            if (isTemplateLiteralKind(kind)) {
+                 result = factory.createTemplateLiteralLikeNode(kind, "", "", /*templateFlags*/ undefined);
+            }
+            else {
                 switch (kind) {
                     case SyntaxKind.NumericLiteral:
-                        return factory.createNumericLiteral("", /*numericLiteralFlags*/ undefined);
+                        result = factory.createNumericLiteral("", /*numericLiteralFlags*/ undefined);
+                        break;
                     case SyntaxKind.StringLiteral:
-                        return factory.createStringLiteral("", /*isSingleQuote*/ undefined);
+                        result = factory.createStringLiteral("", /*isSingleQuote*/ undefined);
+                        break;
                     case SyntaxKind.MissingDeclaration:
-                        return factory.createMissingDeclaration();
+                        result = factory.createMissingDeclaration();
+                        break;
                     case SyntaxKind.Identifier:
-                        return factory.createIdentifier("", /*typeArguments*/ undefined, /*originalKeywordKind*/ undefined);
+                        result = factory.createIdentifier("", /*typeArguments*/ undefined, /*originalKeywordKind*/ undefined);
+                        break;
                     default:
-                        return factory.createToken(kind);
+                        result = factory.createToken(kind);
+                        break;
                 }
             }
-            const result = createNodeBasedOnSyntaxKind();
+
             return finishNode(result, pos) as T;
         }
 
