@@ -9012,34 +9012,29 @@ namespace ts {
             function visitNode(child: IncrementalNode) {
                 Debug.assert(child.pos <= child.end);
                 if (child.pos > changeRangeOldEnd) {
-                    // Node is entirely past the change range.  We need to move both its pos and
-                    // end, forward or backward appropriately.
                     moveElementEntirelyPastChangeRange(child, /*isArray*/ false, delta, oldText, newText, aggressiveChecks);
                     return;
                 }
-
-                // Check if the element intersects the change range.  If it does, then it is not
-                // reusable.  Also, we'll need to recurse to see what constituent portions we may
-                // be able to use.
                 const fullEnd = child.end;
-                if (fullEnd >= changeStart) {
-                    child.intersectsChange = true;
-                    child._children = undefined;
-
-                    // Adjust the pos or end (or both) of the intersecting element accordingly.
-                    adjustIntersectingElement(child, changeStart, changeRangeOldEnd, changeRangeNewEnd, delta);
-                    forEachChild(child, visitNode, visitArray);
-                    if (hasJSDocNodes(child)) {
-                        for (const jsDocComment of child.jsDoc!) {
-                            visitNode(jsDocComment as Node as IncrementalNode);
-                        }
-                    }
-                    checkNodePositions(child, aggressiveChecks);
+                const intersectsChangeRange = fullEnd >= changeStart;
+                if (intersectsChangeRange) {
+                    checkChildrenIntersections(child);
                     return;
                 }
-
-                // Otherwise, the node is entirely before the change range.  No need to do anything with it.
                 Debug.assert(fullEnd < changeStart);
+            }
+
+            function checkChildrenIntersections(child: IncrementalNode) {
+                child.intersectsChange = true;
+                child._children = undefined;
+                adjustIntersectingElement(child, changeStart, changeRangeOldEnd, changeRangeNewEnd, delta);
+                forEachChild(child, visitNode, visitArray);
+                if (hasJSDocNodes(child)) {
+                    for (const jsDocComment of child.jsDoc!) {
+                        visitNode(jsDocComment as Node as IncrementalNode);
+                    }
+                }
+                checkNodePositions(child, aggressiveChecks);
             }
 
             function visitArray(array: IncrementalNodeArray) {
