@@ -7754,8 +7754,6 @@ namespace ts {
                 const end = length === undefined ? content.length : start + length;
                 length = end - start;
                 const dict: { [key: string]: Function; } = {
-                    //"author": {run: parseAuthorTag(start, tagName, margin, indentText)}
-                    //"author": parseAuthorTag()
                     author: parseAuthorTag,
                     implements: parseImplementsTag,
                     augments: parseAugmentsTag,
@@ -7770,9 +7768,9 @@ namespace ts {
                     deprecated: parseSimpleTagAllocator,
                     this: parseThisTag,
                     enum: parseEnumTag,
-                    //arg: parseParameterOrPropertyTag,
-                    //argument: parseParameterOrPropertyTag,
-                    //param: parseParameterOrPropertyTag,
+                    arg: parseParameterAllocator,
+                    argument: parseParameterAllocator,
+                    param: parseParameterAllocator,
                     return: parseReturnTag,
                     returns: parseReturnTag,
                     template: parseTemplateTag,
@@ -7970,52 +7968,26 @@ namespace ts {
                     Debug.assert(token() === SyntaxKind.AtToken);
                     const start = scanner.getTokenPos();
                     nextTokenJSDoc();
-
                     const tagName = parseJSDocIdentifierName(/*message*/ undefined);
                     const indentText = skipWhitespaceOrAsterisk();
-
                     const tag = parseTagHelper(tagName, start, margin, indentText);
-
                     return tag;
                 }
 
                 function parseTagHelper(tagName: Identifier, start: number, margin: number, indentText: string) {
                     let tag: JSDocTag | undefined;
-
-                    switch (tagName.escapedText) {
-                        case "author":
-                        case "implements":
-                        case "augments":
-                        case "extends":
-                        case "class":
-                        case "constructor":
-                        case "public":
-                        case "private":
-                        case "protected":
-                        case "readonly":
-                        case "override":
-                        case "deprecated":
-                        case "this":
-                        case "enum":
-                        case "return":
-                        case "returns":
-                        case "template":
-                        case "type":
-                        case "typedef":
-                        case "callback":
-                        case "see":
-                            const getTag = dict[tagName.escapedText];
-                            tag = getTag(start, tagName, margin, indentText);
-                            break;
-                        case "arg":
-                        case "argument":
-                        case "param":
-                            return parseParameterOrPropertyTag(start, tagName, PropertyLikeParse.Parameter, margin);
-                        default:
-                            tag = parseUnknownTag(start, tagName, margin, indentText);
-                            break;
+                    if (dict.hasOwnProperty("" + tagName.escapedText)) {
+                        const getTag = dict["" + tagName.escapedText];
+                        tag = getTag(start, tagName, margin, indentText);
+                    }
+                    else {
+                        tag = parseUnknownTag(start, tagName, margin, indentText);
                     }
                     return tag;
+                }
+
+                function parseParameterAllocator(start: number, tagName: Identifier, margin: number) {
+                    return parseParameterOrPropertyTag(start, tagName, PropertyLikeParse.Parameter, margin);
                 }
 
                 function parseSimpleTagAllocator(start: number, tagName: Identifier, margin: number, indentText: string) {
