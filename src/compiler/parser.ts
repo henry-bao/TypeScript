@@ -7753,7 +7753,7 @@ namespace ts {
                 const content = sourceText;
                 const end = length === undefined ? content.length : start + length;
                 length = end - start;
-                const dict: { [key: string]: Function; } = {
+                const tagToParser: { [key: string]: Function; } = {
                     author: parseAuthorTag,
                     implements: parseImplementsTag,
                     augments: parseAugmentsTag,
@@ -7779,6 +7779,7 @@ namespace ts {
                     callback: parseCallbackTag,
                     see: parseSeeTag
                 };
+                
 
                 Debug.assert(start >= 0);
                 Debug.assert(start <= end);
@@ -7976,8 +7977,8 @@ namespace ts {
 
                 function parseTagHelper(tagName: Identifier, start: number, margin: number, indentText: string) {
                     let tag: JSDocTag | undefined;
-                    if (dict.hasOwnProperty("" + tagName.escapedText)) {
-                        const getTag = dict["" + tagName.escapedText];
+                    if (tagToParser.hasOwnProperty("" + tagName.escapedText)) {
+                        const getTag = tagToParser["" + tagName.escapedText];
                         tag = getTag(start, tagName, margin, indentText);
                     }
                     else {
