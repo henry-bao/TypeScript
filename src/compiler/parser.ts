@@ -8013,7 +8013,9 @@ namespace ts {
                 }
 
                 function parseSimpleTagAllocator(start: number, tagName: Identifier, margin: number, indentText: string) {
-                    const tagConstructor: (name: Identifier, text: string) => JSDocTag = simpleTagToJSDocTagConstructor[`${tagName.escapedText}Tag`];
+                    if (tagName.escapedText === "deprecated") hasDeprecatedTag = true;
+                    const tagConstructor: (tagName: Identifier | undefined,
+                                           comment?: string | NodeArray<JSDocComment>) => JSDocTag = simpleTagToJSDocTagConstructor[`${tagName.escapedText}Tag`];
                     const tag: JSDocTag | undefined = parseSimpleTag(start, tagConstructor, tagName, margin, indentText);
                     return tag;
                 }
