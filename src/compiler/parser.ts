@@ -8006,50 +8006,6 @@ namespace ts {
                 function parseSimpleTagAllocator(start: number, tagName: Identifier, margin: number, indentText: string) {
                     const tagConstructor: (name: Identifier, text: string) => JSDocTag = simpleTagToJSDocTagConstructor[`${tagName.escapedText}Tag`];
                     const tag: JSDocTag | undefined = parseSimpleTag(start, tagConstructor, tagName, margin, indentText);
-
-                    /************************************************************************
-                     * Remove below if what I did is correct
-                     ***********************************************************************/
-
-                    // let tag: JSDocTag | undefined;
-
-                    /*if (simpleTagToJSDocTagConstructor.hasOwnProperty("" + tagName.escapedText)) {
-                        let tagConstructor : Function = simpleTagToJSDocTagConstructor["" + tagName.escapedText];
-                        tag = parseSimpleTag(start, tagConstructor, tagName, margin, indentText);
-                    }
-                    parseSimpleTag(start, factory.createJSDocClassTag, tagName, margin, indentText);*/
-
-                    // switch (tagName.escapedText) {
-                    //     case "class":
-                    //     case "constructor":
-                    //         //let tagConstructor: Function = simpleTagToJSDocTagConstructor["constructor"];
-                    //         //tag = parseSimpleTag(start, tagConstructor, tagName, margin, indentText);
-                    //         tag = parseSimpleTag(start, factory.createJSDocClassTag, tagName, margin, indentText);
-                    //         break;
-                    //     case "public":
-                    //         tag = parseSimpleTag(start, factory.createJSDocPublicTag, tagName, margin, indentText);
-                    //         break;
-                    //     case "private":
-                    //         tag = parseSimpleTag(start, factory.createJSDocPrivateTag, tagName, margin, indentText);
-                    //         break;
-                    //     case "protected":
-                    //         tag = parseSimpleTag(start, factory.createJSDocProtectedTag, tagName, margin, indentText);
-                    //         break;
-                    //     case "readonly":
-                    //         tag = parseSimpleTag(start, factory.createJSDocReadonlyTag, tagName, margin, indentText);
-                    //         break;
-                    //     case "override":
-                    //         tag = parseSimpleTag(start, factory.createJSDocOverrideTag, tagName, margin, indentText);
-                    //         break;
-                    //     case "deprecated":
-                    //         hasDeprecatedTag = true;
-                    //         tag = parseSimpleTag(start, factory.createJSDocDeprecatedTag, tagName, margin, indentText);
-                    // }
-
-                    /************************************************************************
-                     * Remove above if what I did is correct ^^^
-                     ***********************************************************************/
-
                     return tag;
                 }
 
