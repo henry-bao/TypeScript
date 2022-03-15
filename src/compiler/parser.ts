@@ -1812,13 +1812,31 @@ namespace ts {
             }
 
             const pos = getNodePos();
-            const result =
-                kind === SyntaxKind.Identifier ? factory.createIdentifier("", /*typeArguments*/ undefined, /*originalKeywordKind*/ undefined) :
-                isTemplateLiteralKind(kind) ? factory.createTemplateLiteralLikeNode(kind, "", "", /*templateFlags*/ undefined) :
-                kind === SyntaxKind.NumericLiteral ? factory.createNumericLiteral("", /*numericLiteralFlags*/ undefined) :
-                kind === SyntaxKind.StringLiteral ? factory.createStringLiteral("", /*isSingleQuote*/ undefined) :
-                kind === SyntaxKind.MissingDeclaration ? factory.createMissingDeclaration() :
-                factory.createToken(kind);
+            let result: TemplateLiteralLikeNode | NumericLiteral | StringLiteral | MissingDeclaration | Identifier | Token<T["kind"]>;
+
+            if (isTemplateLiteralKind(kind)) {
+                 result = factory.createTemplateLiteralLikeNode(kind, "", "", /*templateFlags*/ undefined);
+            }
+            else {
+                switch (kind) {
+                    case SyntaxKind.NumericLiteral:
+                        result = factory.createNumericLiteral("", /*numericLiteralFlags*/ undefined);
+                        break;
+                    case SyntaxKind.StringLiteral:
+                        result = factory.createStringLiteral("", /*isSingleQuote*/ undefined);
+                        break;
+                    case SyntaxKind.MissingDeclaration:
+                        result = factory.createMissingDeclaration();
+                        break;
+                    case SyntaxKind.Identifier:
+                        result = factory.createIdentifier("", /*typeArguments*/ undefined, /*originalKeywordKind*/ undefined);
+                        break;
+                    default:
+                        result = factory.createToken(kind);
+                        break;
+                }
+            }
+
             return finishNode(result, pos) as T;
         }
 
@@ -7744,6 +7762,45 @@ namespace ts {
                 const content = sourceText;
                 const end = length === undefined ? content.length : start + length;
                 length = end - start;
+                const tagToParser: { [key: string]: Function; } = {
+                    author: parseAuthorTag,
+                    implements: parseImplementsTag,
+                    augments: parseAugmentsTag,
+                    extends: parseAugmentsTag,
+                    class: parseSimpleTagAllocator,
+                    constructor: parseSimpleTagAllocator,
+                    public: parseSimpleTagAllocator,
+                    private: parseSimpleTagAllocator,
+                    protected: parseSimpleTagAllocator,
+                    readonly: parseSimpleTagAllocator,
+                    override: parseSimpleTagAllocator,
+                    deprecated: parseSimpleTagAllocator,
+                    this: parseThisTag,
+                    enum: parseEnumTag,
+                    arg: parseParameterAllocator,
+                    argument: parseParameterAllocator,
+                    param: parseParameterAllocator,
+                    return: parseReturnTag,
+                    returns: parseReturnTag,
+                    template: parseTemplateTag,
+                    type: parseTypeTag,
+                    typedef: parseTypedefTag,
+                    callback: parseCallbackTag,
+                    see: parseSeeTag
+                };
+
+                const simpleTagToJSDocTagConstructor: {
+                    [key: string]: (tagName: Identifier | undefined, comment?: string | NodeArray<JSDocComment>) => JSDocTag;
+                } = {
+                    classTag: factory.createJSDocClassTag,
+                    constructorTag: factory.createJSDocClassTag,
+                    publicTag: factory.createJSDocPublicTag,
+                    privateTag: factory.createJSDocPrivateTag,
+                    protectedTag: factory.createJSDocProtectedTag,
+                    readonlyTag: factory.createJSDocReadonlyTag,
+                    overrideTag: factory.createJSDocOverrideTag,
+                    deprecatedTag: factory.createJSDocDeprecatedTag
+                };
 
                 Debug.assert(start >= 0);
                 Debug.assert(start <= end);
@@ -7933,78 +7990,31 @@ namespace ts {
                     Debug.assert(token() === SyntaxKind.AtToken);
                     const start = scanner.getTokenPos();
                     nextTokenJSDoc();
-
                     const tagName = parseJSDocIdentifierName(/*message*/ undefined);
                     const indentText = skipWhitespaceOrAsterisk();
+                    const tag = parseTagHelper(tagName, start, margin, indentText);
+                    return tag;
+                }
 
+                function parseTagHelper(tagName: Identifier, start: number, margin: number, indentText: string) {
                     let tag: JSDocTag | undefined;
-                    switch (tagName.escapedText) {
-                        case "author":
-                            tag = parseAuthorTag(start, tagName, margin, indentText);
-                            break;
-                        case "implements":
-                            tag = parseImplementsTag(start, tagName, margin, indentText);
-                            break;
-                        case "augments":
-                        case "extends":
-                            tag = parseAugmentsTag(start, tagName, margin, indentText);
-                            break;
-                        case "class":
-                        case "constructor":
-                            tag = parseSimpleTag(start, factory.createJSDocClassTag, tagName, margin, indentText);
-                            break;
-                        case "public":
-                            tag = parseSimpleTag(start, factory.createJSDocPublicTag, tagName, margin, indentText);
-                            break;
-                        case "private":
-                            tag = parseSimpleTag(start, factory.createJSDocPrivateTag, tagName, margin, indentText);
-                            break;
-                        case "protected":
-                            tag = parseSimpleTag(start, factory.createJSDocProtectedTag, tagName, margin, indentText);
-                            break;
-                        case "readonly":
-                            tag = parseSimpleTag(start, factory.createJSDocReadonlyTag, tagName, margin, indentText);
-                            break;
-                        case "override":
-                            tag = parseSimpleTag(start, factory.createJSDocOverrideTag, tagName, margin, indentText);
-                            break;
-                        case "deprecated":
-                            hasDeprecatedTag = true;
-                            tag = parseSimpleTag(start, factory.createJSDocDeprecatedTag, tagName, margin, indentText);
-                            break;
-                        case "this":
-                            tag = parseThisTag(start, tagName, margin, indentText);
-                            break;
-                        case "enum":
-                            tag = parseEnumTag(start, tagName, margin, indentText);
-                            break;
-                        case "arg":
-                        case "argument":
-                        case "param":
-                            return parseParameterOrPropertyTag(start, tagName, PropertyLikeParse.Parameter, margin);
-                        case "return":
-                        case "returns":
-                            tag = parseReturnTag(start, tagName, margin, indentText);
-                            break;
-                        case "template":
-                            tag = parseTemplateTag(start, tagName, margin, indentText);
-                            break;
-                        case "type":
-                            tag = parseTypeTag(start, tagName, margin, indentText);
-                            break;
-                        case "typedef":
-                            tag = parseTypedefTag(start, tagName, margin, indentText);
-                            break;
-                        case "callback":
-                            tag = parseCallbackTag(start, tagName, margin, indentText);
-                            break;
-                        case "see":
-                            tag = parseSeeTag(start, tagName, margin, indentText);
-                            break;
-                        default:
-                            tag = parseUnknownTag(start, tagName, margin, indentText);
-                            break;
+                    if (tagToParser.hasOwnProperty("" + tagName.escapedText)) {
+                        const getTag = tagToParser["" + tagName.escapedText];
+                        tag = getTag(start, tagName, margin, indentText);
                     }
+                    else {
+                        tag = parseUnknownTag(start, tagName, margin, indentText);
+                    }
+                    return tag;
+                }
+
+                function parseParameterAllocator(start: number, tagName: Identifier, margin: number) {
+                    return parseParameterOrPropertyTag(start, tagName, PropertyLikeParse.Parameter, margin);
+                }
+
+                function parseSimpleTagAllocator(start: number, tagName: Identifier, margin: number, indentText: string) {
+                    const tagConstructor: (name: Identifier, text: string) => JSDocTag = simpleTagToJSDocTagConstructor[`${tagName.escapedText}Tag`];
+                    const tag: JSDocTag | undefined = parseSimpleTag(start, tagConstructor, tagName, margin, indentText);
                     return tag;
                 }
 
@@ -8990,34 +9000,29 @@ namespace ts {
             function visitNode(child: IncrementalNode) {
                 Debug.assert(child.pos <= child.end);
                 if (child.pos > changeRangeOldEnd) {
-                    // Node is entirely past the change range.  We need to move both its pos and
-                    // end, forward or backward appropriately.
                     moveElementEntirelyPastChangeRange(child, /*isArray*/ false, delta, oldText, newText, aggressiveChecks);
                     return;
                 }
-
-                // Check if the element intersects the change range.  If it does, then it is not
-                // reusable.  Also, we'll need to recurse to see what constituent portions we may
-                // be able to use.
                 const fullEnd = child.end;
-                if (fullEnd >= changeStart) {
-                    child.intersectsChange = true;
-                    child._children = undefined;
-
-                    // Adjust the pos or end (or both) of the intersecting element accordingly.
-                    adjustIntersectingElement(child, changeStart, changeRangeOldEnd, changeRangeNewEnd, delta);
-                    forEachChild(child, visitNode, visitArray);
-                    if (hasJSDocNodes(child)) {
-                        for (const jsDocComment of child.jsDoc!) {
-                            visitNode(jsDocComment as Node as IncrementalNode);
-                        }
-                    }
-                    checkNodePositions(child, aggressiveChecks);
+                const intersectsChangeRange = fullEnd >= changeStart;
+                if (intersectsChangeRange) {
+                    checkChildrenIntersections(child);
                     return;
                 }
-
-                // Otherwise, the node is entirely before the change range.  No need to do anything with it.
                 Debug.assert(fullEnd < changeStart);
+            }
+
+            function checkChildrenIntersections(child: IncrementalNode) {
+                child.intersectsChange = true;
+                child._children = undefined;
+                adjustIntersectingElement(child, changeStart, changeRangeOldEnd, changeRangeNewEnd, delta);
+                forEachChild(child, visitNode, visitArray);
+                if (hasJSDocNodes(child)) {
+                    for (const jsDocComment of child.jsDoc!) {
+                        visitNode(jsDocComment as Node as IncrementalNode);
+                    }
+                }
+                checkNodePositions(child, aggressiveChecks);
             }
 
             function visitArray(array: IncrementalNodeArray) {
