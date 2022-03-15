@@ -7762,6 +7762,45 @@ namespace ts {
                 const content = sourceText;
                 const end = length === undefined ? content.length : start + length;
                 length = end - start;
+                const tagToParser: { [key: string]: Function; } = {
+                    author: parseAuthorTag,
+                    implements: parseImplementsTag,
+                    augments: parseAugmentsTag,
+                    extends: parseAugmentsTag,
+                    class: parseSimpleTagAllocator,
+                    constructor: parseSimpleTagAllocator,
+                    public: parseSimpleTagAllocator,
+                    private: parseSimpleTagAllocator,
+                    protected: parseSimpleTagAllocator,
+                    readonly: parseSimpleTagAllocator,
+                    override: parseSimpleTagAllocator,
+                    deprecated: parseSimpleTagAllocator,
+                    this: parseThisTag,
+                    enum: parseEnumTag,
+                    arg: parseParameterAllocator,
+                    argument: parseParameterAllocator,
+                    param: parseParameterAllocator,
+                    return: parseReturnTag,
+                    returns: parseReturnTag,
+                    template: parseTemplateTag,
+                    type: parseTypeTag,
+                    typedef: parseTypedefTag,
+                    callback: parseCallbackTag,
+                    see: parseSeeTag
+                };
+
+                const simpleTagToJSDocTagConstructor: {
+                    [key: string]: (tagName: Identifier | undefined, comment?: string | NodeArray<JSDocComment>) => JSDocTag;
+                } = {
+                    classTag: factory.createJSDocClassTag,
+                    constructorTag: factory.createJSDocClassTag,
+                    publicTag: factory.createJSDocPublicTag,
+                    privateTag: factory.createJSDocPrivateTag,
+                    protectedTag: factory.createJSDocProtectedTag,
+                    readonlyTag: factory.createJSDocReadonlyTag,
+                    overrideTag: factory.createJSDocOverrideTag,
+                    deprecatedTag: factory.createJSDocDeprecatedTag
+                };
 
                 Debug.assert(start >= 0);
                 Debug.assert(start <= end);
@@ -7947,86 +7986,35 @@ namespace ts {
                     return seenLineBreak ? indentText : "";
                 }
 
-
-
                 function parseTag(margin: number) {
                     Debug.assert(token() === SyntaxKind.AtToken);
                     const start = scanner.getTokenPos();
                     nextTokenJSDoc();
-
                     const tagName = parseJSDocIdentifierName(/*message*/ undefined);
                     const indentText = skipWhitespaceOrAsterisk();
+                    const tag = parseTagHelper(tagName, start, margin, indentText);
+                    return tag;
+                }
 
+                function parseTagHelper(tagName: Identifier, start: number, margin: number, indentText: string) {
                     let tag: JSDocTag | undefined;
-
-                    switch (tagName.escapedText) {
-                      case "author":
-                          tag = parseAuthorTag(start, tagName, margin, indentText);
-                          break;
-                      case "implements":
-                          tag = parseImplementsTag(start, tagName, margin, indentText);
-                          break;
-                      case "augments":
-                      case "extends":
-                          tag = parseAugmentsTag(start, tagName, margin, indentText);
-                          break;
-                      case "class":
-                      case "constructor":
-                          tag = parseSimpleTag(start, factory.createJSDocClassTag, tagName, margin, indentText);
-                          break;
-                      case "public":
-                          tag = parseSimpleTag(start, factory.createJSDocPublicTag, tagName, margin, indentText);
-                          break;
-                      case "private":
-                          tag = parseSimpleTag(start, factory.createJSDocPrivateTag, tagName, margin, indentText);
-                          break;
-                      case "protected":
-                          tag = parseSimpleTag(start, factory.createJSDocProtectedTag, tagName, margin, indentText);
-                          break;
-                      case "readonly":
-                          tag = parseSimpleTag(start, factory.createJSDocReadonlyTag, tagName, margin, indentText);
-                          break;
-                      case "override":
-                          tag = parseSimpleTag(start, factory.createJSDocOverrideTag, tagName, margin, indentText);
-                          break;
-                      case "deprecated":
-                          hasDeprecatedTag = true;
-                          tag = parseSimpleTag(start, factory.createJSDocDeprecatedTag, tagName, margin, indentText);
-                          break;
-                      case "this":
-                          tag = parseThisTag(start, tagName, margin, indentText);
-                          break;
-                      case "enum":
-                          tag = parseEnumTag(start, tagName, margin, indentText);
-                          break;
-                      case "arg":
-                      case "argument":
-                      case "param":
-                          return parseParameterOrPropertyTag(start, tagName, PropertyLikeParse.Parameter, margin);
-                      case "return":
-                      case "returns":
-                          tag = parseReturnTag(start, tagName, margin, indentText);
-                          break;
-                      case "template":
-                          tag = parseTemplateTag(start, tagName, margin, indentText);
-                          break;
-                      case "type":
-                          tag = parseTypeTag(start, tagName, margin, indentText);
-                          break;
-                      case "typedef":
-                          tag = parseTypedefTag(start, tagName, margin, indentText);
-                          break;
-                      case "callback":
-                          tag = parseCallbackTag(start, tagName, margin, indentText);
-                          break;
-                      case "see":
-                          tag = parseSeeTag(start, tagName, margin, indentText);
-                          break;
-                      default:
-                          tag = parseUnknownTag(start, tagName, margin, indentText);
-                          break;
+                    if (tagToParser.hasOwnProperty("" + tagName.escapedText)) {
+                        const getTag = tagToParser["" + tagName.escapedText];
+                        tag = getTag(start, tagName, margin, indentText);
                     }
+                    else {
+                        tag = parseUnknownTag(start, tagName, margin, indentText);
+                    }
+                    return tag;
+                }
 
+                function parseParameterAllocator(start: number, tagName: Identifier, margin: number) {
+                    return parseParameterOrPropertyTag(start, tagName, PropertyLikeParse.Parameter, margin);
+                }
+
+                function parseSimpleTagAllocator(start: number, tagName: Identifier, margin: number, indentText: string) {
+                    const tagConstructor: (name: Identifier, text: string) => JSDocTag = simpleTagToJSDocTagConstructor[`${tagName.escapedText}Tag`];
+                    const tag: JSDocTag | undefined = parseSimpleTag(start, tagConstructor, tagName, margin, indentText);
                     return tag;
                 }
 
